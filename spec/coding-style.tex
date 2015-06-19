@@ -1,0 +1,24 @@
+\subsection*{Coding style}
+
+Your solution must conform to the Linux kernel coding style document available
+at \url{http://www.kernel.org/doc/Documentation/CodingStyle} (or
+\texttt{Documentation/CodingStyle} in the kernel source tree). You may wish to
+run your code through the \texttt{checkpatch} tool to validate that your
+solution adheres to the coding style. The following arguments may be useful to
+you (where \texttt{FILE} is the C source file you wish to check):
+
+\begin{verbatim}
+checkpatch --no-tree --no-signoff -f --no-summary FILE
+\end{verbatim}
+
+The tool is available to download from
+\url{http://kernel.org/pub/linux/kernel/people/apw/checkpatch/checkpatch.pl-0.29}.
+
+You may also find the \texttt{indent(1)} tool useful with the following arguments:
+
+\begin{verbatim}
+indent -kr -i8 FILE
+\end{verbatim}
+
+Please note that these are tools only --- they should not be considered
+perfect. Always double-check the results by hand to be sure.

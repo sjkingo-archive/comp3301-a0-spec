@@ -1,0 +1,378 @@
+\documentclass[12pt,a4paper]{article}
+
+\input{style.sty}
+
+%% metadata for pdf 
+\newcommand{\pdfsubj}{COMP3301\slash COMP7308}
+\newcommand{\pdftitle}{Assignment 0 --- Shell using system calls}
+\newcommand{\pdfauthor}{John Williams and Sam Kingston}
+\newcommand{\assignnum}{a0}
+\newcommand{\assignweight}{10\% }
+\input{hypersetup.tex}
+
+%% due for release 2011-07-29
+\newcommand{\duedate}{{\color{red}8pm} Thursday 18 August 2011}
+
+\begin{document}
+
+\input{title.tex}
+
+\begin{center}
+\color{red}
+Version 1.1 --- 10 August 2011 \\
+See Changelog on last page for updates.
+\end{center}
+
+\subsection*{Introduction}
+
+The goal of this assignment is to refresh your knowledge of the C programming
+language and the skills you will need to work at the kernel-level interface of
+an operating system (Linux). Your task is to create a simple shell that must
+use system calls (rather than the higher-level C library wrappers) to access
+the kernel.
+
+As part of the assessment you must also answer some short--response questions
+that will test your understanding of the concepts that you have implemented.
+
+This is an \textbf{individual assignment}. You are free to discuss the concepts 
+of this assignment will fellow students, but it is considered cheating to look
+at another student's code or allow your code to be seen or copied. You should
+be aware that all code submitted may be subject to automated checks by
+plagiarism-detection software. You should read and understand the school's policy
+on student misconduct, which is available at: \url{http://www.itee.uq.edu.au/about_ITEE/policies/student-misconduct.html}.
+
+\subsection*{Program behaviour}
+
+The program you must produce will be called \texttt{shell} and will take no
+command-line arguments. You do not have to handle the case where arguments are
+given to your program, though your program should not crash.
+
+When started your program should wait for commands to be given (one per line,
+terminated by a \verb|\n|) from \textit{standard in}. The command should then
+be executed and its output printed to \textit{standard out} (if any).  Another
+command should then be accepted.
+
+If \texttt{EOF} is read on \textit{standard in}, your program should exit with
+status 0. This is the only time your program should exit (other than the usual
+signals which you do not have to handle). You may assume that each line of input
+will have no preceding whitespace and that each argument (if any) is separated
+by a single space.  Blank lines should be ignored. Your program does not need
+to handle processing input lines longer than 1024 characters long (including
+newline). If it reads a line longer than this, it should print out 
+\verb|input was too long\n| to \textit{standard error} and wait for another
+line to be input. 
+
+If a line starts with a command that is not specified below, your program
+should output \verb|unrecognised command %s\n| to \textit{standard error}
+(where \verb|%s| is the name of the command).
+
+You should ensure your program behaves correctly when \textit{standard in} is
+redirected from a file.
+
+Make sure you print any messages or output stated in this specification exactly
+as shown, including any newline. There should be no whitespace before or after
+the message.
+
+\subsection*{System calls \textit{vs.} C library functions}
+
+The \textit{primary functionality} of the assignment must be implemented with
+system calls only. Miscellaneous I\slash O (for example user input) may use the
+convenience functions in \texttt{stdio.h}, \texttt{stdlib.h},
+\texttt{string.h}, etc.
+
+If you are unsure if a function is a library function or a system call, the
+following command may be useful:
+
+\verb:man -k <foo> | grep '\(2\)':
+
+(where \texttt{<foo>} is the function you are interested in). If the function
+you are looking for is not listed in the output, it is not a system call.
+
+You will be heavily penalised for breaking this requirement, so if in doubt,
+ask.
+
+\subsection*{Builtin commands}
+
+You must implement three builtin commands, as specified below. You may assume
+that each command will be given the correct number of arguments as specified.
+
+\subsubsection*{1: List a file or directory contents recursively}
+
+\texttt{lsr [filename|directory]}
+
+The command \texttt{lsr} has two modes, depending on the argument given.
+
+If the argument given is a filename, list the details of that file only. The
+following attributes should be printed in order (each separated by a space):
+entry type, size (in bytes) padded to 10 spaces, and the filename. The filename
+should have its leading directory stripped (if any). See below for an example.
+
+%% remove if anything changes above
+\clearpage
+The type of an entry to be printed is given in the following table:
+
+\begin{longtable}{l c}
+    \toprule
+
+    regular file & \texttt{f} \\
+    directory & \texttt{d} \\
+    symbolic link & \texttt{s} \\
+    any other type & \texttt{o} \\
+
+    \bottomrule
+\end{longtable}
+
+If the argument given is a symbolic link, details on the link should be returned
+--- not the file it refers to.
+
+For example, typing \texttt{lsr /bin/bash} might show the following:
+
+\begin{verbatim}
+f     934336 bash\end{verbatim}
+
+If the argument given is a directory (or no argument is given, in which case
+assume it is the current directory), first list each entry in that directory
+using the format described above, then recurse into each subdirectory (if any)
+and list the entries in that directory (and so on). You should make sure you
+list all the entries in a parent directory before recursing into a
+subdirectory. Before printing the contents of a directory, your program should
+print the directory's name followed by a colon. After listing a directory's
+contents, a blank line should be printed.  See below for an example.
+
+A directory listing should list the files in the order returned by the kernel:
+no further sorting is required. You need not perform any preprocessing on paths
+given. The \texttt{.} and \texttt{..} entries should be ignored and not
+included in the output.
+
+For example, typing \texttt{lsr} without any argument might show the following:
+
+\begin{verbatim}
+.:
+f        102 Makefile
+f      19123 shell
+f       7212 shell.c
+f      15504 shell.o
+d         72 tests
+s         27 mark.sh
+o       5433 device
+
+./tests:
+d         72 cases
+f        455 README
+
+./tests/cases:
+f          0 test-case-1
+\end{verbatim}
+
+Your program should print a \textit{descriptive} error to \textit{standard
+error} if the filename or directory given could not be accessed (this includes
+any permission problems). You may wish to consider using \texttt{perror(3)} for 
+printing errors. All other output must be written to \textit{standard out}.
+
+\textit{Hint:} read the manual pages for the \texttt{getdents(2)} and
+\texttt{stat(2)} system calls in their entirety!
+
+\subsubsection*{2: Copy a regular file}
+
+\texttt{cp source dest}
+
+Copy the \textit{regular file} given by the source argument to the given
+destination. After a successful copy, the contents of the destination file
+\textit{must be identical} to the source: this command must work with both text
+and binary files. Text files may contain both both ASCII and Unicode characters
+and this should not stop your program from functioning correctly. There should
+be no upper limit to the size of files that your program can copy. You may assume
+sufficient disk space exists to copy to the destination.
+
+Attempting to copy any other type of source file (symbolic link, directory,
+block special, \textit{etc}.) should cause the error message 
+\verb|source file type not supported\n| to be printed and no copy should be performed.
+
+If the destination file does not exist, permissions on the source file should 
+be preserved (excluding ownership) when creating it, including any execute bit 
+that was set. You do not have to handle changing permissions on the destination file
+if it already exists.
+
+If the destination file exists and is a regular file, your program should
+attempt to overwrite it. If it is a directory, then your program should copy
+the source file into that directory, using the same filename as the source (for instance
+\verb|cp foo subdir| will attempt to copy \texttt{foo} to \texttt{subdir/foo}).
+Attempting to copy to any other type of destination file should fail with the
+error message \verb|destination file type not supported\n|.
+
+If the source file cannot be opened (for whatever reason), then the destination
+file should not be created, or modified in any way if it already exists.
+Consider using \texttt{perror(3)} for providing descriptive error messages when
+the source file cannot be opened.  Provided the copy is successful and there
+was no error, nothing should be printed to \textit{standard out}. Any errors
+that do occur should be printed to \textit{standard error}.
+
+Do not attempt to copy one byte at a time --- this is very inefficient and will
+likely cause your program to time out when being tested.
+
+You do not have to handle the case where the same source and destination filenames
+given to \texttt{cp} are the same (it will not be tested).
+
+\textit{Hint}: the \texttt{diff} and \texttt{cmp} commands may be useful for
+validating that the contents of two files are identical.
+
+\subsubsection*{3: Remove a regular file or directory recursively}
+
+\texttt{rm filename|directory}
+
+Remove the regular filename or directory tree given from the file system. This
+should act in the same way as \texttt{rm(1)} does with the \texttt{-rf}
+arguments.
+
+Any symbolic links encountered should cause the link to be removed, not the
+file they reference.
+
+If the argument given is a directory, your program should attempt to remove the
+directory and its contents from the system. Your program is expected to handle
+any type of file or directory (including deep directory trees) that are
+encountered.
+
+If the file or directory specified does not exist, or a permissions problem
+prevents its removal, a descriptive error should be printed to \textit{standard
+error}.
+
+\subsection*{Short-response questions}
+
+\begin{enumerate}
+    \item Give a brief overview of the algorithm you used to implement the recursive directory listing. Pseudocode is not required.
+    \item What Linux-specific privilege would be required to preserve ownership on files that are copied? Describe how one would obtain this privilege.
+    \item What is the practical difference between using the \texttt{getdents(2)} system call and the \texttt{scandir(3)} library call? Some things to consider might be portability, safety and ease of use.
+    \item Copying data using \texttt{read(2)} and \texttt{write(2)} is the conventional way to implement the copy functionality specified in this assignment. However there is another system call that is designed for this purpose and is more efficient. Which system call is this, and what are the differences between using it and the standard \texttt{read}\slash \texttt{write} system calls? Why is it more efficient?
+\end{enumerate}
+
+\subsection*{Code compilation}
+
+As part of your submission you must provide a \texttt{Makefile} that will build
+your program and produce the \texttt{shell} executable when invoked by
+\texttt{make}; that is:
+
+\begin{verbatim} make \end{verbatim}
+
+The \texttt{Makefile} should use \texttt{gcc} with the \texttt{-Wall
+-std=gnu99} compile flags.  Compilation should not yield any warnings or
+errors, or marks may be deducted (as specified in the marking criteria).  If
+the \texttt{shell} executable cannot be created you will receive 0 marks for
+functionality (see below).
+
+You must not link with any other libraries other than the default C library.
+
+\input{coding-style.tex}
+
+\input{submission.tex}
+
+\subsection*{Assessment criteria}
+
+Marks will be awarded based on the correctness of the program and the coding
+style used, as well as the answers to the questions above.
+
+\subsubsection*{Functionality (60 marks)}
+
+Your program will be run through an automated test suite that will test the
+following functionality and assign marks as specified. Please note that you are
+expected to write your own tests to ensure your program functions correctly ---
+this test suite will not be made available to you.
+
+The penalty for using a C library function where a system call should have been
+used instead is 5 marks per violation, up to a maximum of 40 marks.
+
+\begin{longtable}{l p{12cm} r} \toprule
+
+    \multicolumn{2}{l}{\textbf{Criteria}} & \textbf{Marks available} \\
+
+    \midrule \multicolumn{2}{l}{\textbf{1: List a file or directory contents
+    recursively}} & \textbf{27 marks} \\
+    %% 1a gives 4 marks for 4 different files
+    \textit{1a:} & Program correctly lists a single (valid) file & 4 \\
+    %% 1b, 1c: 4 marks for 4 different directories in each case
+    \textit{1b:} & Program correctly lists the contents of the current directory (with no subdirectories present) & 2 \\
+    \textit{1c:} & Program correctly lists the contents of a given (valid) directory (with no subdirectories present) & 3 \\
+    \textit{1d:} & Program correctly lists the contents of a given (valid) directory (with a single subdirectory present) & 6 \\
+    \textit{1e:} & Program correctly lists the contents of a given (valid) directory (with a deep subdirectory tree) & 8 \\
+    %% 1d gives 2 marks: one for a file, one for a dir
+    \textit{1f:} & Program handles being given a non-existent path & 2 \\
+    \textit{1g:} & Program handles not having permission to traverse a directory & 1 \\
+    \textit{1h:} & Program handles not having permission to stat a file in a directory & 1 \\
+
+    & & \\ \midrule \multicolumn{2}{l}{\textbf{2: Copy a regular file}} &
+    \textbf{16 marks} \\
+    %% 2a: small, medium, large
+    \textit{2a:} & Program successfully copies the contents of binary files & 3
+    \\
+    %% 2b: small ASCII, small unicode, large ASCII
+    \textit{2b:} & Program successfully copies the contents of text files & 2 \\
+    \textit{2c:} & Program successfully copies a file with the correct filename when a directory is given as destination & 2 \\
+    \textit{2d:} & Program successfully preserves permissions on destination & 2 \\
+    \textit{2e:} & Program handles failure to open source file for reading & 1 \\
+    \textit{2f:} & Program handles failure to open destination file for writing & 1 \\
+    \textit{2g:} & Program does not create or modify destination file if source cannot be opened & 1 \\ 
+    \textit{2h:} & Program does not modify source file in any way & 1 \\
+    \textit{2i:} & Program produces correct error message when a non-regular file is specified as source & 1 \\
+    \textit{2j:} & Program produces correct error message when a non-regular file (excluding directory) is specified as destination & 1 \\
+    \textit{2k:} & Program copies a file efficiently & 1 \\
+
+    & & \\ \midrule \multicolumn{2}{l}{\textbf{3: Remove a file or directory  recursively}} & \textbf{11 marks} \\
+    \textit{3a:} & Program successfully removes a single file & 1 \\
+    \textit{3b:} & Program successfully removes an empty directory & 1 \\
+    \textit{3c:} & Program successfully removes a non-empty directory including subdirectories & 5 \\
+    \textit{3d:} & Program removes a symbolic link and leaves the file it refers to intact & 1 \\
+    \textit{3e:} & Program produces an error if it is given an invalid path & 1 \\
+    \textit{3f:} & Program produces an error if a file cannot be removed due to permissions & 1 \\
+    \textit{3g:} & Program produces an error if a directory cannot be removed due to permissions & 1 \\
+
+    & & \\ \midrule \multicolumn{2}{l}{\textbf{4: General tests}} & \textbf{6 marks} \\
+    \textit{4a:} & Program is able to process multiple input lines & 2 \\
+    \textit{4b:} & Program is able to handle large input lines (up to 1023 visible characters, including newline) & 1 \\
+    \textit{4c:} & Program ignores blank input lines successfully & 1 \\
+    \textit{4d:} & Program produces correct error message if an input line longer than 1024 characters is given & 1 \\
+    \textit{4e:} & Program produces correct error message if unknown command is given & 1 \\
+
+    \bottomrule \end{longtable}
+
+\subsubsection*{Documentation, style and build system (20 marks)}
+
+\begin{longtable}{p{13cm} r} \toprule \textbf{Criteria} & \textbf{Marks available} \\
+
+    \midrule Program builds cleanly with no compiler warnings (1 mark will be deducted per warning up to a total of 3) & 3 \\ 
+    Comments throughout code where appropriate for the marker to understand & 5 \\
+    Coding style follows the Linux kernel coding style document (1 mark will be deducted per violation up to a total of 7) & 7 \\
+    Evidence of regular progress through Subversion commit history & 5 \\
+
+    \bottomrule \end{longtable}
+
+\subsubsection*{Short-response questions (20 marks)}
+
+Your responses will be assessed for their clarity and completeness, and marks
+will be assigned as follows:
+
+\begin{longtable}{p{13cm} r}
+    \toprule
+    \textbf{Question} & \textbf{Marks available} \\
+
+    \midrule
+    Question 1: Recursive directory listing overview & 3 \\
+    Question 2: Preserving ownership & 5 \\
+    Question 3: \texttt{getdents(2)} vs. \texttt{scandir(3)} & 6 \\
+    Question 4: \texttt{read}\slash \texttt{write} vs. mystery system call & 6 \\
+
+    \bottomrule
+\end{longtable}
+
+\subsection*{Changelog}
+
+\subsubsection*{v1.0 --- 2 June 2011}
+\begin{compactenum}
+    \item Initial version
+\end{compactenum}
+
+\subsubsection*{v1.1 --- 10 August 2011}
+\begin{compactenum}
+    \item Due time changed to 8pm, same day (18 August 2011)
+\end{compactenum}
+
+
+\end{document}
